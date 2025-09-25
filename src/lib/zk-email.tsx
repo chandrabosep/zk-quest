@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import zkeSDK, { Proof } from "@zk-email/sdk";
+import type { Proof } from "@zk-email/sdk";
 import {
 	zkVerifySession,
 	Library,
@@ -187,8 +187,9 @@ export default function ZkEmail({
 			// Read the file as text
 			const eml = await file.text();
 
-			// Initialize the SDK
-			const sdk = zkeSDK();
+			// Initialize the SDK (use named init factory from v2)
+			const { initZkEmailSdk } = (await import("@zk-email/sdk")) as any;
+			const sdk = initZkEmailSdk();
 
 			// Get the blueprint
 			const blueprint = await sdk.getBlueprint(

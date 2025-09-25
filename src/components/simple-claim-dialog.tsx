@@ -12,7 +12,7 @@ import {
 	Github,
 	ArrowRight,
 } from "lucide-react";
-import ZkEmail from "@/lib/zk-email";
+import { verifyEmail, waitForEmailVerification } from "@/lib/zk-email-simple";
 
 interface SimpleClaimDialogProps {
 	isOpen: boolean;
@@ -91,97 +91,11 @@ export function SimpleClaimDialog({
 				throw new Error("Please upload a .eml file");
 			}
 
-			// Step 1: Generate ZK proof
-			const eml = await emlFile.text();
-			console.log("[Claim] EML loaded", { length: eml.length });
-
-			// Import ZK Email SDK dynamically
-			console.log("[Claim] Importing @zk-email/sdk");
-			const { default: zkeSDK } = await import("@zk-email/sdk");
-
-			// Initialize the SDK
-			console.log("[Claim] Initializing SDK");
-			const sdk = zkeSDK();
-
-			// Get the blueprint
-			console.log(
-				"[Claim] Fetching blueprint",
-				"chandrabosep/retro_github@v3"
-			);
-			const blueprint = await sdk.getBlueprint(
-				"chandrabosep/retro_github@v3"
-			);
-			console.log("[Claim] Blueprint ready", {
-				blueprintKeys: Object.keys(blueprint || {}),
-			});
-
-			// Create a prover (prefer remote proving, fallback to local)
-			const prover = blueprint.createProver({ isLocal: false });
-			console.log("[Claim] Prover created", {
-				isLocal: prover?.options?.isLocal,
-			});
-
-			// Define external inputs - only username is needed
-			const externalInputs = [
-				{
-					name: "username",
-					value: username.trim(),
-					maxLength: 100,
-				},
-			];
-			console.log("[Claim] External inputs", externalInputs);
-
-			// Generate the proof with external inputs
-			console.log("[Claim] Trying remote proving (generateProofRequest)");
-			let generatedProof: any;
-			try {
-				let inProgress = await prover.generateProofRequest(
-					eml,
-					externalInputs
-				);
-				console.log("[Claim] Remote proving started", {
-					proofId: inProgress?.props?.id,
-					status: inProgress?.props?.status,
-				});
-
-				// Poll until done or failed (max ~2 minutes)
-				let attempts = 0;
-				while (attempts < 24) {
-					const keepWaiting = await inProgress.checkStatus();
-					console.log(
-						"[Claim] Remote status",
-						inProgress?.props?.status
-					);
-					if (!keepWaiting) break;
-					attempts++;
-				}
-
-				if (inProgress?.props?.status !== "Done") {
-					throw new Error(
-						`Remote proving did not complete (status: ${inProgress?.props?.status})`
-					);
-				}
-
-				generatedProof = inProgress;
-				console.log("[Claim] Remote proving completed");
-			} catch (remoteErr) {
-				console.warn(
-					"[Claim] Remote proving failed, falling back to local",
-					remoteErr
-				);
-				generatedProof = await prover.generateLocalProof(
-					eml,
-					externalInputs
-				);
-				console.log("[Claim] Local proving completed");
+			// Step 1: Generate and verify via helper (no blueprint input)
+			const verification = await verifyEmail(emlFile, username.trim());
+			if (!verification.isValid) {
+				throw new Error(verification.error || "Verification failed");
 			}
-			setProof(generatedProof);
-			console.log("[Claim] Proof generated", {
-				publicOutputs: generatedProof?.props?.publicOutputs,
-				proofDataKeys: Object.keys(
-					generatedProof?.props?.proofData || {}
-				),
-			});
 
 			// Step 2: Submit claim with proof
 			const formData = new FormData();
@@ -189,7 +103,10 @@ export function SimpleClaimDialog({
 			formData.append("userId", address);
 			formData.append("username", username.trim());
 			formData.append("emlFile", emlFile);
-			formData.append("proof", JSON.stringify(generatedProof));
+			formData.append(
+				"proof",
+				JSON.stringify(verification.proofData || {})
+			);
 			console.log("[Claim] Submitting /api/claims", { questId, address });
 
 			const response = await fetch("/api/claims", {
