@@ -1,9 +1,8 @@
 "use client";
 
-import { wagmiAdapter, projectId } from "@/config";
+import { wagmiAdapter, projectId, horizonTestnet } from "@/config";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createAppKit } from "@reown/appkit/react";
-import { mainnet, arbitrum } from "@reown/appkit/networks";
 import React, { type ReactNode } from "react";
 import { cookieToInitialState, WagmiProvider, type Config } from "wagmi";
 
@@ -26,8 +25,8 @@ const metadata = {
 const modal = createAppKit({
 	adapters: [wagmiAdapter],
 	projectId,
-	networks: [mainnet, arbitrum],
-	defaultNetwork: mainnet,
+	networks: [horizonTestnet],
+	defaultNetwork: horizonTestnet,
 	metadata: metadata,
 	features: {
 		analytics: true,

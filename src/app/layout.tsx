@@ -6,10 +6,12 @@ const inter = Inter({ subsets: ["latin"] });
 
 import { headers } from "next/headers"; // added
 import ContextProvider from "@/context";
+import Navbar from "@/components/layout/navbar";
 
 export const metadata: Metadata = {
-	title: "AppKit Example App",
-	description: "Powered by Reown",
+	title: "ZKQuest - Decentralized Bounty Platform",
+	description:
+		"Complete quests, earn rewards, and build your reputation in the ZKQuest ecosystem",
 };
 
 export default async function RootLayout({
@@ -23,7 +25,12 @@ export default async function RootLayout({
 	return (
 		<html lang="en">
 			<body className={inter.className}>
-				<ContextProvider cookies={cookies}>{children}</ContextProvider>
+				<ContextProvider cookies={cookies}>
+					<div className="min-h-screen bg-gray-50">
+						<Navbar />
+						<main>{children}</main>
+					</div>
+				</ContextProvider>
 			</body>
 		</html>
 	);

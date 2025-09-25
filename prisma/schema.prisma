@@ -1,0 +1,97 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String  @id @default(cuid())
+  walletAddress String  @unique
+  username      String?
+  email         String? @unique
+  xp            Int     @default(0)
+  level         Int     @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questsCreated Quest[] @relation("QuestCreator")
+  claims        Claim[]
+}
+
+model Quest {
+  id          String       @id @default(cuid())
+  title       String
+  description String
+  githubUrl   String? // GitHub repository URL for the quest
+  type        QuestType
+  expiry      DateTime? // only for time-based quests
+  tags        TagOnQuest[]
+  status      QuestStatus  @default(OPEN)
+
+  creatorId String
+  creator   User   @relation("QuestCreator", fields: [creatorId], references: [id])
+
+  rewardAmount    Float // reward amount in ETH
+  suppliedFunds   Float // actual funds deposited by creator
+  fundsReleased   Boolean @default(false) // whether funds have been released to claimer
+  transactionHash String? // blockchain transaction hash for escrow deposit
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  claims Claim[]
+}
+
+model Claim {
+  id       String      @id @default(cuid())
+  questId  String
+  userId   String
+  proofUrl String? // link to .eml or zk-proof (future)
+  status   ClaimStatus @default(PENDING)
+
+  quest Quest @relation(fields: [questId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Tag {
+  id     String       @id @default(cuid())
+  name   String       @unique
+  quests TagOnQuest[]
+}
+
+model TagOnQuest {
+  questId String
+  tagId   String
+
+  quest Quest @relation(fields: [questId], references: [id])
+  tag   Tag   @relation(fields: [tagId], references: [id])
+
+  @@id([questId, tagId])
+}
+
+enum QuestType {
+  REGULAR
+  TIME_BASED
+}
+
+enum QuestStatus {
+  OPEN
+  COMPLETED
+  EXPIRED
+}
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
