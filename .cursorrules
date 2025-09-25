@@ -1,0 +1,181 @@
+Got it 👍 You want me to **fix and complete the Prisma schema + DB logic spec** for your ZKQuest bounty platform MVP. Below is a clean, hackathon-ready **DB + logic structure**:
+
+---
+
+# 🚀 ZKQuest: Bounty Platform DB & Logic (MVP Spec)
+
+## Features (Phase 1: DB & Core Logic Only)
+
+-   Uses **Prisma ORM** (Postgres DB)
+-   Uses **Supabase** for realtime updates (leaderboard + user wall)
+-   **Quests:**
+
+    -   Regular Quests → Standard bounties
+    -   Time-Based Quests → Expire after a deadline (first-come, first-served)
+
+-   **Quest Creation:**
+
+    -   Inputs: `name`, `description`, `tags`
+    -   (If time-based) → `expiry` datetime
+    -   Escrow deposit (on-chain contract integration, placeholder now)
+
+-   **Tags** for filtering/browsing quests
+-   **Claim Flow:**
+
+    -   User uploads `.eml` (GitHub merge notification)
+    -   (Placeholder for ZK verification logic)
+    -   On success → funds released from escrow → user wallet
+
+---
+
+## 🗂️ Project Structure (DB/Logic Focus)
+
+```
+prisma/
+ └── schema.prisma   # Prisma models
+
+src/
+ ├── db/             # DB logic (Prisma client, services)
+ ├── pages/          # API endpoints (quests, claims, leaderboard)
+ ├── utils/          # Helpers (time-based checks, tag filtering)
+ └── contracts/      # (future) escrow + payout contracts
+```
+
+---
+
+## 📝 Prisma Schema (Fixed & Cleaned)
+
+```prisma
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  walletAddress String    @unique
+  username      String?
+  email         String?   @unique
+  xp            Int       @default(0)
+  level         Int       @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questsCreated Quest[]   @relation("QuestCreator")
+  claims        Claim[]
+}
+
+model Quest {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  type        QuestType
+  expiry      DateTime? // only for time-based quests
+  tags        TagOnQuest[]
+  status      QuestStatus @default(OPEN)
+
+  creatorId String
+  creator   User @relation("QuestCreator", fields: [creatorId], references: [id])
+
+  escrowAddress String?  // smart contract escrow
+  rewardAmount  Float    // in ETH or token (on-chain)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  claims Claim[]
+}
+
+model Claim {
+  id        String   @id @default(cuid())
+  questId   String
+  userId    String
+  proofUrl  String?   // link to .eml or zk-proof (future)
+  status    ClaimStatus @default(PENDING)
+
+  quest Quest @relation(fields: [questId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  quests TagOnQuest[]
+}
+
+model TagOnQuest {
+  questId String
+  tagId   String
+
+  quest Quest @relation(fields: [questId], references: [id])
+  tag   Tag   @relation(fields: [tagId], references: [id])
+
+  @@id([questId, tagId])
+}
+
+enum QuestType {
+  REGULAR
+  TIME_BASED
+}
+
+enum QuestStatus {
+  OPEN
+  COMPLETED
+  EXPIRED
+}
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+```
+
+---
+
+## 🔧 Logic Flow (DB-Level)
+
+1. **Quest Creation**
+
+    - User creates a quest (`title`, `description`, `tags`, `type`, `expiry?`, `rewardAmount`)
+    - Funds locked in **escrowAddress** (smart contract placeholder)
+    - Status = `OPEN`
+
+2. **Quest Claim**
+
+    - User submits claim with `.eml` proof → stored as `Claim` with `PENDING` status
+    - (Future: Run ZK verification → mark `APPROVED` if valid)
+    - If quest type = `TIME_BASED` and claim is first valid before expiry → approve, mark quest `COMPLETED`
+    - If expired with no valid claim → mark `EXPIRED` and return funds
+
+3. **Leaderboard**
+
+    - Supabase listens for changes on `Claim` table
+    - Updates XP, levels, and ranking in real time
+
+4. **User Wall**
+
+    - Fetch user profile: completed quests, XP, badges
+    - Publicly visible with Supabase subscriptions
+
+---
+
+⚡ With this schema & flow, you can:
+
+-   Spin up Prisma migrations in minutes
+-   Plug Supabase subscriptions into Leaderboard/User Wall
+-   Add ZKVerify + smart contract escrow later
+
+---
+
+Do you want me to **also write the API endpoint stubs** (`quest.create`, `quest.claim`, `leaderboard.get`) in TypeScript so your backend skeleton is ready for the hackathon?
